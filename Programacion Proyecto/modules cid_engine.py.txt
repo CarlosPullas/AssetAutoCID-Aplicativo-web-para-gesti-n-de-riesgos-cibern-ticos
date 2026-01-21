@@ -1,0 +1,105 @@
+\begin{lstlisting}[language=Python, caption={modules/cid_engine.py - Motor CID (Confidencialidad, Integridad, Disponibilidad)}]
+# modules/cid_engine.py
+# ------------------------------------------------------------
+# Motor de valoración CID:
+#   - Asigna valores C/I/D por tipo de activo
+#   - Calcula criticidad = C + I + D
+#   - Traduce criticidad a un nivel de impacto (Bajo/Medio/Alto/Crítico)
+#
+# Esto cumple el requisito:
+#  "Asignación de valores según criterios definidos (C, I, D)"
+# ------------------------------------------------------------
+
+from typing import Tuple
+
+
+# ============================================================
+# 1) Valores CID por tipo de activo
+# ============================================================
+
+def cid_for(tipo: str) -> Tuple[int, int, int]:
+    """
+    Retorna una tupla (C, I, D) según el tipo de activo.
+
+    Escala sugerida:
+      1 = Muy bajo
+      2 = Bajo
+      3 = Medio
+      4 = Alto
+      5 = Muy alto
+
+    Reglas base usadas en este proyecto:
+      - Base de datos:
+          C=5 (alta sensibilidad)
+          I=5 (alteración es crítica)
+          D=4 (la indisponibilidad afecta operación)
+      - Servicio (web/correo):
+          C=2 (muchos servicios son públicos)
+          I=3 (integridad importa)
+          D=4 (disponibilidad suele ser crítica)
+      - Hardware:
+          C=3, I=3, D=3 (impacto medio balanceado)
+    """
+
+    if tipo == "Base de datos":
+        return (5, 5, 4)
+
+    if tipo == "Servicio":
+        return (2, 3, 4)
+
+    if tipo == "Hardware":
+        return (3, 3, 3)
+
+    # Caso por defecto (si aparece un tipo no contemplado)
+    return (3, 3, 3)
+
+
+# ============================================================
+# 2) Cálculo de criticidad
+# ============================================================
+
+def criticidad(C: int, I: int, D: int) -> int:
+    """
+    Calcula la criticidad como suma:
+        criticidad = C + I + D
+
+    Resultado típico:
+      minimo: 3
+      maximo: 15
+    """
+    return int(C) + int(I) + int(D)
+
+
+# ============================================================
+# 3) Clasificación del impacto a partir del valor
+# ============================================================
+
+def impacto(valor: int) -> str:
+    """
+    Traduce el valor de criticidad a un nivel cualitativo.
+    Rangos sugeridos (puedes ajustar según tu instructivo):
+      3-6   -> Bajo
+      7-10  -> Medio
+      11-13 -> Alto
+      14-15 -> Crítico
+    """
+    v = int(valor)
+
+    if 3 <= v <= 6:
+        return "Bajo"
+    if 7 <= v <= 10:
+        return "Medio"
+    if 11 <= v <= 13:
+        return "Alto"
+    return "Crítico"
+
+
+# ============================================================
+# 4) Nota de escalabilidad (opcional)
+# ============================================================
+# Para un sistema más realista, cid_for(tipo) debería:
+#   - basarse en atributos del activo (dato/servicio/cliente/PII)
+#   - permitir configuración por JSON (matriz CID por activo)
+#   - aplicar ponderaciones (ej: 0.4C + 0.3I + 0.3D)
+# En este proyecto se implementa una versión simple y defendible.
+\end{lstlisting}

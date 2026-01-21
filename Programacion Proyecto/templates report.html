@@ -1,0 +1,169 @@
+\begin{lstlisting}[language=HTML, caption={templates/report.html - Reporte ejecutivo de activos (HTML para PDF/WeasyPrint)}]
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <title>Reporte de Activos - {{ empresa }}</title>
+
+  <style>
+    /* ---- Estilos seguros para WeasyPrint ---- */
+    @page { size: A4; margin: 18mm; }
+
+    body { font-family: Arial, sans-serif; color: #111; }
+    h1 { margin: 0 0 6px 0; }
+    h2 { margin: 18px 0 8px 0; }
+    p  { margin: 6px 0; }
+
+    .meta {
+      font-size: 12px; color: #333;
+      padding: 10px; border: 1px solid #ddd;
+      border-radius: 8px; background: #fafafa;
+    }
+
+    .kpis {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 12px 0 0 0;
+    }
+    .kpis td {
+      border: 1px solid #e0e0e0;
+      padding: 10px;
+      font-size: 13px;
+      vertical-align: top;
+      border-radius: 8px;
+    }
+
+    /* Tablas grandes: evitar cortes feos */
+    table { border-collapse: collapse; width: 100%; }
+    th, td { border: 1px solid #ddd; padding: 7px; font-size: 12px; vertical-align: top; }
+    th { background: #f2f2f2; text-align: left; }
+
+    /* Evitar que una fila se parta a mitad de página */
+    tr { page-break-inside: avoid; }
+
+    .badge {
+      padding: 3px 8px;
+      border-radius: 10px;
+      border: 1px solid #bbb;
+      display: inline-block;
+      font-size: 11px;
+      background: #fff;
+      white-space: nowrap;
+    }
+
+    .grid {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 10px;
+    }
+    .grid td {
+      border: none;
+      padding: 6px;
+      text-align: center;
+      vertical-align: top;
+    }
+
+    .chart {
+      max-width: 250px;
+      width: 100%;
+      height: auto;
+      border: 1px solid #eee;
+      border-radius: 10px;
+      padding: 6px;
+      background: #fff;
+    }
+
+    .chartwide {
+      max-width: 520px;
+      width: 100%;
+      height: auto;
+      border: 1px solid #eee;
+      border-radius: 10px;
+      padding: 6px;
+      background: #fff;
+    }
+
+    .small { font-size: 11px; color: #444; }
+
+    /* Forzar salto de página antes del listado si quieres orden */
+    .pagebreak { page-break-before: always; }
+  </style>
+</head>
+
+<body>
+
+  <h1>Reporte Ejecutivo de Activos</h1>
+  <div class="meta">
+    <p><b>Empresa:</b> {{ empresa }}</p>
+    <p><b>Fecha:</b> {{ fecha }} &nbsp; | &nbsp; <b>Target:</b> {{ target }}</p>
+  </div>
+
+  <h2>Resumen</h2>
+  <table class="kpis">
+    <tr>
+      <td><b>Total activos</b><br><span style="font-size:22px;">{{ total }}</span></td>
+      <td><b>Críticos (14-15)</b><br><span style="font-size:22px;">{{ criticos }}</span></td>
+      <td><b>Altos (11-13)</b><br><span style="font-size:22px;">{{ altos }}</span></td>
+      <td><b>Medios (7-10)</b><br><span style="font-size:22px;">{{ medios }}</span></td>
+    </tr>
+  </table>
+
+  <h2>Gráficos</h2>
+
+  <!-- 3 pasteles -->
+  <table class="grid">
+    <tr>
+      <td>
+        <img class="chart" src="{{ chart_tipo }}" alt="Activos por tipo">
+        <div class="small">Activos por tipo</div>
+      </td>
+      <td>
+        <img class="chart" src="{{ chart_impacto }}" alt="Activos por impacto">
+        <div class="small">Activos por impacto</div>
+      </td>
+      <td>
+        <img class="chart" src="{{ chart_sensibilidad }}" alt="Activos por sensibilidad">
+        <div class="small">Activos por sensibilidad</div>
+      </td>
+    </tr>
+  </table>
+
+  <!-- Barras (ancho) -->
+  <table class="grid">
+    <tr>
+      <td>
+        <img class="chartwide" src="{{ chart_top_criticidad }}" alt="Top criticidad">
+        <div class="small">Top activos por criticidad (CID)</div>
+      </td>
+    </tr>
+  </table>
+
+  <div class="pagebreak"></div>
+
+  <h2>Listado</h2>
+  <table>
+    <tr>
+      <th>ID</th>
+      <th>Ubicación</th>
+      <th>Tipo</th>
+      <th>Descripción</th>
+      <th>Sensibilidad</th>
+      <th>Criticidad</th>
+      <th>Impacto</th>
+    </tr>
+    {% for a in activos %}
+    <tr>
+      <td>{{ a["ID"] }}</td>
+      <td>{{ a["Ubicación"] }}</td>
+      <td>{{ a["Tipo de activo"] }}</td>
+      <td>{{ a["Descripción"] }}</td>
+      <td>{{ a["Sensibilidad"] }}</td>
+      <td><span class="badge">{{ a["Criticidad"] }}</span></td>
+      <td>{{ a["Impacto"] }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+
+</body>
+</html>
+\end{lstlisting}

@@ -1,0 +1,127 @@
+\begin{lstlisting}[language=Python, caption={modules/charts.py - Gráficos (pie y barras) compatibles con Flask/WeasyPrint}]
+# modules/charts.py
+# ------------------------------------------------------------
+# Genera gráficos para reportes (PNG) usando matplotlib.
+# IMPORTANTE:
+#   En servidores Flask (threads), matplotlib puede fallar si usa Tk.
+#   Para evitar "RuntimeError: main thread is not in main loop",
+#   forzamos backend "Agg" (no requiere GUI).
+#
+# Gráficos generados:
+#   - Pie: activos por tipo
+#   - Pie: activos por impacto
+#   - Pie: activos por sensibilidad
+#   - Barras: criticidad por activo (Top N)
+#
+# Retorna un dict con nombres de archivos generados,
+# para que el HTML/PDF los pueda incluir.
+# ------------------------------------------------------------
+
+import os
+from collections import Counter
+from typing import Dict, List
+
+# Backend seguro para servidores (no GUI)
+import matplotlib
+matplotlib.use("Agg")
+
+import matplotlib.pyplot as plt
+
+
+def _ensure_dir(out_dir: str) -> None:
+    """Crea el directorio de salida si no existe."""
+    os.makedirs(out_dir, exist_ok=True)
+
+
+def _save_pie(counter: Counter, title: str, out_path: str) -> None:
+    """
+    Genera y guarda un gráfico de pastel (pie chart).
+    counter: Counter({"Servicio": 3, "Hardware": 2, ...})
+    """
+    labels = list(counter.keys())
+    sizes = list(counter.values())
+
+    plt.figure()
+    plt.title(title)
+
+    if sum(sizes) == 0:
+        # Caso borde: sin datos
+        plt.text(0.5, 0.5, "Sin datos", ha="center", va="center")
+        plt.axis("off")
+    else:
+        # autopct muestra porcentaje redondeado
+        plt.pie(sizes, labels=labels, autopct="%1.0f%%", startangle=90)
+        plt.axis("equal")
+
+    plt.tight_layout()
+    plt.savefig(out_path, dpi=150)
+    plt.close()
+
+
+def _save_bar_top(activos: List[Dict], title: str, out_path: str, top_n: int = 10) -> None:
+    """
+    Genera gráfico de barras con los Top N activos por criticidad.
+    activos esperado:
+      [{"ID": "...", "Criticidad": 14, ...}, ...]
+    """
+    # Ordenar por criticidad desc
+    ordered = sorted(activos, key=lambda a: a.get("Criticidad", 0), reverse=True)[:top_n]
+
+    labels = [a.get("ID", "?") for a in ordered]
+    values = [int(a.get("Criticidad", 0)) for a in ordered]
+
+    plt.figure(figsize=(8, 4))
+    plt.title(title)
+    plt.bar(labels, values)
+
+    plt.xlabel("Activo (ID)")
+    plt.ylabel("Criticidad (C+I+D)")
+    plt.xticks(rotation=45, ha="right")
+
+    plt.tight_layout()
+    plt.savefig(out_path, dpi=150)
+    plt.close()
+
+
+def generate_charts(activos_for_report: List[Dict], out_dir: str) -> Dict[str, str]:
+    """
+    Genera gráficos PNG en out_dir y retorna un dict con nombres (relativos)
+    para usarlos en plantillas HTML/PDF.
+
+    activos_for_report debe incluir claves como:
+      - "Tipo de activo"
+      - "Impacto"
+      - "Sensibilidad"
+      - "Criticidad"
+      - "ID"
+    """
+    _ensure_dir(out_dir)
+
+    # Contadores para pie charts
+    tipo_counts = Counter([a.get("Tipo de activo", "(sin tipo)") for a in activos_for_report])
+    impacto_counts = Counter([a.get("Impacto", "(sin impacto)") for a in activos_for_report])
+    sens_counts = Counter([a.get("Sensibilidad", "(sin sens)") for a in activos_for_report])
+
+    # Rutas de salida
+    tipo_path = os.path.join(out_dir, "chart_tipo.png")
+    impacto_path = os.path.join(out_dir, "chart_impacto.png")
+    sens_path = os.path.join(out_dir, "chart_sensibilidad.png")
+    bar_path = os.path.join(out_dir, "chart_top_criticidad.png")
+
+    # Generar charts
+    _save_pie(tipo_counts, "Activos por tipo", tipo_path)
+    _save_pie(impacto_counts, "Activos por impacto", impacto_path)
+    _save_pie(sens_counts, "Activos por sensibilidad", sens_path)
+
+    # Barras: Top criticidad
+    _save_bar_top(activos_for_report, "Top activos por criticidad", bar_path, top_n=10)
+
+    # Retornamos nombres relativos (porque HTML usa base_url=OUTPUT_DIR)
+    return {
+        "chart_tipo": "chart_tipo.png",
+        "chart_impacto": "chart_impacto.png",
+        "chart_sensibilidad": "chart_sensibilidad.png",
+        "chart_top_criticidad": "chart_top_criticidad.png",
+    }
+
+\end{lstlisting}

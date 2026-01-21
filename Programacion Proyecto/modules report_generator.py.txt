@@ -1,0 +1,60 @@
+\begin{lstlisting}[language=Python, caption={modules/report_generator.py - Render del reporte ejecutivo (activos)}]
+# modules/report_generator.py
+# ------------------------------------------------------------
+# Renderiza un reporte ejecutivo de activos (HTML) usando Jinja2
+# y el template: templates/report.html
+#
+# Entradas:
+#   - empresa
+#   - target
+#   - activos (list[dict] con campos: ID, Ubicación, Tipo de activo,
+#             Descripción, Sensibilidad, Criticidad, Impacto)
+#   - charts (dict con nombres de archivos PNG que están en output/)
+#
+# Salida:
+#   - guarda un HTML listo para ser convertido a PDF
+# ------------------------------------------------------------
+
+from datetime import datetime
+from jinja2 import Environment, FileSystemLoader
+from typing import Dict, List
+
+
+def generate_html_report(
+    template_dir: str,
+    empresa: str,
+    target: str,
+    activos: List[dict],
+    out_path: str,
+    charts: Dict[str, str],
+) -> None:
+    """
+    Renderiza templates/report.html y lo guarda en out_path.
+    """
+    env = Environment(loader=FileSystemLoader(template_dir))
+    tpl = env.get_template("report.html")
+
+    total = len(activos)
+    criticos = sum(1 for a in activos if int(a.get("Criticidad", 0)) >= 14)
+    altos = sum(1 for a in activos if 11 <= int(a.get("Criticidad", 0)) <= 13)
+    medios = sum(1 for a in activos if 7 <= int(a.get("Criticidad", 0)) <= 10)
+
+    html = tpl.render(
+        empresa=empresa,
+        fecha=datetime.now().strftime("%Y-%m-%d %H:%M"),
+        target=target,
+        total=total,
+        criticos=criticos,
+        altos=altos,
+        medios=medios,
+        activos=activos,
+        # Charts (nombres relativos dentro de output/)
+        chart_tipo=charts.get("chart_tipo", ""),
+        chart_impacto=charts.get("chart_impacto", ""),
+        chart_sensibilidad=charts.get("chart_sensibilidad", ""),
+        chart_top_criticidad=charts.get("chart_top_criticidad", ""),
+    )
+
+    with open(out_path, "w", encoding="utf-8") as f:
+        f.write(html)
+\end{lstlisting}

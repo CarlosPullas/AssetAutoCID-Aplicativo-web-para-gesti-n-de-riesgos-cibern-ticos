@@ -1,0 +1,129 @@
+\begin{lstlisting}[language=Python, caption={modules/risk_charts.py - Gráficos para el módulo de riesgos (estado, top, inherente vs residual)}]
+# modules/risk_charts.py
+# ------------------------------------------------------------
+# Gráficos específicos del módulo de riesgos:
+#   - Pie: riesgos por estado (Abierto / En tratamiento / Cerrado)
+#   - Barras: Top riesgos por inherente
+#   - Barras: comparación Inherente vs Residual (Top N)
+#
+# Compatible con Flask (backend Agg).
+# ------------------------------------------------------------
+
+import os
+from typing import Dict, List, Tuple
+
+import matplotlib
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
+
+
+def _ensure_dir(out_dir: str) -> None:
+    os.makedirs(out_dir, exist_ok=True)
+
+
+def _save_pie(labels: List[str], values: List[int], title: str, out_path: str) -> None:
+    plt.figure()
+    plt.title(title)
+
+    if sum(values) == 0:
+        plt.text(0.5, 0.5, "Sin datos", ha="center", va="center")
+        plt.axis("off")
+    else:
+        plt.pie(values, labels=labels, autopct="%1.0f%%", startangle=90)
+        plt.axis("equal")
+
+    plt.tight_layout()
+    plt.savefig(out_path, dpi=150)
+    plt.close()
+
+
+def _save_bar(labels: List[str], values: List[int], title: str, out_path: str, xlabel: str, ylabel: str) -> None:
+    plt.figure(figsize=(8, 4))
+    plt.title(title)
+    plt.bar(labels, values)
+    plt.xlabel(xlabel)
+    plt.ylabel(ylabel)
+    plt.xticks(rotation=45, ha="right")
+    plt.tight_layout()
+    plt.savefig(out_path, dpi=150)
+    plt.close()
+
+
+def _save_bar_compare(labels: List[str], a: List[int], b: List[int], title: str, out_path: str,
+                      a_label: str, b_label: str) -> None:
+    # Comparación en barras “side-by-side”
+    import numpy as np
+
+    x = np.arange(len(labels))
+    width = 0.38
+
+    plt.figure(figsize=(9, 4))
+    plt.title(title)
+
+    plt.bar(x - width/2, a, width, label=a_label)
+    plt.bar(x + width/2, b, width, label=b_label)
+
+    plt.xticks(x, labels, rotation=45, ha="right")
+    plt.xlabel("Riesgo (ID)")
+    plt.ylabel("Score")
+    plt.legend()
+
+    plt.tight_layout()
+    plt.savefig(out_path, dpi=150)
+    plt.close()
+
+
+def generate_risk_charts(
+    risks_rows: List[dict],
+    out_dir: str,
+    top_n: int = 10
+) -> Dict[str, str]:
+    """
+    risks_rows esperado (list[dict]) con campos típicos:
+      - id (riesgo id)
+      - estado
+      - riesgo_inherente
+      - riesgo_residual (opcional o '-')
+    """
+    _ensure_dir(out_dir)
+
+    # 1) Pie por estado
+    estados = {}
+    for r in risks_rows:
+        st = (r.get("estado") or "Abierto").strip()
+        estados[st] = estados.get(st, 0) + 1
+
+    labels_estado = list(estados.keys())
+    values_estado = [estados[k] for k in labels_estado]
+
+    f_estado = os.path.join(out_dir, "chart_riesgos_estado.png")
+    _save_pie(labels_estado, values_estado, "Riesgos por estado", f_estado)
+
+    # 2) Top inherente
+    ordered = sorted(risks_rows, key=lambda x: int(x.get("riesgo_inherente", 0)), reverse=True)[:top_n]
+    labels_top = [f'R-{r.get("id")}' for r in ordered]
+    values_top = [int(r.get("riesgo_inherente", 0)) for r in ordered]
+
+    f_top = os.path.join(out_dir, "chart_top_inherente.png")
+    _save_bar(labels_top, values_top, "Top riesgos por inherente", f_top, "Riesgo", "Inherente (P×I)")
+
+    # 3) Inherente vs Residual (si no hay residual, ponemos 0)
+    inh = []
+    res = []
+    for r in ordered:
+        inh.append(int(r.get("riesgo_inherente", 0)))
+        rv = r.get("riesgo_residual", 0)
+        try:
+            res.append(int(rv))
+        except Exception:
+            res.append(0)
+
+    f_comp = os.path.join(out_dir, "chart_inh_vs_res.png")
+    _save_bar_compare(labels_top, inh, res, "Inherente vs Residual (Top)", f_comp, "Inherente", "Residual")
+
+    return {
+        "chart_riesgos_estado": "chart_riesgos_estado.png",
+        "chart_top_inherente": "chart_top_inherente.png",
+        "chart_inh_vs_res": "chart_inh_vs_res.png",
+    }
+\end{lstlisting}

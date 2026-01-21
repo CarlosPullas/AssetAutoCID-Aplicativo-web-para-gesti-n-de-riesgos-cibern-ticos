@@ -1,0 +1,30 @@
+\begin{lstlisting}[language=Python, caption={modules/pdf_exporter.py - Exportación HTML a PDF (WeasyPrint)}]
+# modules/pdf_exporter.py
+# ------------------------------------------------------------
+# Convierte HTML -> PDF usando WeasyPrint.
+#
+# PUNTO CLAVE:
+#   base_url permite que WeasyPrint encuentre recursos locales:
+#   - imágenes (charts .png) en output/
+#   - css local si existiera
+#
+# Sin base_url, típicamente el PDF sale sin gráficos.
+# ------------------------------------------------------------
+
+from weasyprint import HTML
+
+
+def html_to_pdf(html_path: str, pdf_path: str, base_url: str) -> None:
+    """
+    Genera un PDF desde un archivo HTML.
+
+    Params:
+      - html_path: ruta del HTML generado
+      - pdf_path: ruta del PDF final
+      - base_url: directorio base donde están los recursos (ej: OUTPUT_DIR)
+
+    Ejemplo:
+      html_to_pdf("output/reporte.html", "output/reporte.pdf", "output/")
+    """
+    HTML(filename=html_path, base_url=base_url).write_pdf(pdf_path)
+\end{lstlisting}

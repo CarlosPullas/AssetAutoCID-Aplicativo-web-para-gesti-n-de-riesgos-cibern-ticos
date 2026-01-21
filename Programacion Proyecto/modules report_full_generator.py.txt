@@ -1,0 +1,76 @@
+\begin{lstlisting}[language=Python, caption={modules/report_full_generator.py - Informe técnico completo (activos + riesgos + controles + residual + KPIs)}]
+# modules/report_full_generator.py
+# ------------------------------------------------------------
+# Genera un informe técnico completo (HTML) que incluye:
+#  1) Activos y valoración CID
+#  2) Identificación de riesgos (amenaza, vulnerabilidad, control existente)
+#  3) Tratamiento (estrategia, ISO 27002, responsable, estado)
+#  4) Riesgo residual (evaluación post-controles)
+#  5) Comunicación/consulta (observaciones)
+#  6) Monitoreo (KPIs: abiertos, tratamiento, cerrados)
+#
+# Template: templates/report_full.html
+# ------------------------------------------------------------
+
+from datetime import datetime
+from typing import Dict, List
+from jinja2 import Environment, FileSystemLoader
+
+
+def generate_full_report(
+    template_dir: str,
+    empresa: str,
+    responsable: str,
+    target: str,
+    activos: List[dict],
+    risks_rows: List[dict],
+    charts_activos: Dict[str, str],
+    charts_riesgos: Dict[str, str],
+    out_path: str
+) -> None:
+    env = Environment(loader=FileSystemLoader(template_dir))
+    tpl = env.get_template("report_full.html")
+
+    # KPIs riesgos
+    abiertos = sum(1 for r in risks_rows if (r.get("estado") or "").lower().startswith("abierto"))
+    tratamiento = sum(1 for r in risks_rows if (r.get("estado") or "").lower().startswith("en tratamiento"))
+    cerrados = sum(1 for r in risks_rows if (r.get("estado") or "").lower().startswith("cerrado"))
+
+    # Activos: KPIs
+    total_activos = len(activos)
+    criticos = sum(1 for a in activos if int(a.get("Criticidad", 0)) >= 14)
+    altos = sum(1 for a in activos if 11 <= int(a.get("Criticidad", 0)) <= 13)
+
+    html = tpl.render(
+        empresa=empresa,
+        responsable=responsable,
+        fecha=datetime.now().strftime("%Y-%m-%d %H:%M"),
+        target=target,
+
+        # Activos
+        total_activos=total_activos,
+        criticos=criticos,
+        altos=altos,
+        activos=activos,
+
+        # Riesgos + monitoreo
+        abiertos=abiertos,
+        tratamiento=tratamiento,
+        cerrados=cerrados,
+        risks=risks_rows,
+
+        # Charts de activos
+        chart_tipo=charts_activos.get("chart_tipo", ""),
+        chart_impacto=charts_activos.get("chart_impacto", ""),
+        chart_sensibilidad=charts_activos.get("chart_sensibilidad", ""),
+        chart_top_criticidad=charts_activos.get("chart_top_criticidad", ""),
+
+        # Charts de riesgos
+        chart_riesgos_estado=charts_riesgos.get("chart_riesgos_estado", ""),
+        chart_top_inherente=charts_riesgos.get("chart_top_inherente", ""),
+        chart_inh_vs_res=charts_riesgos.get("chart_inh_vs_res", ""),
+    )
+
+    with open(out_path, "w", encoding="utf-8") as f:
+        f.write(html)
+\end{lstlisting}

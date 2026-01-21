@@ -1,0 +1,69 @@
+\begin{lstlisting}[language=Python, caption={modules/excel_generator.py - Exportación a Excel (inventario + cálculo CID)}]
+# modules/excel_generator.py
+# ------------------------------------------------------------
+# Genera un archivo Excel con 2 hojas:
+#   1) "Listado y Valoración" -> inventario completo del activo
+#   2) "Cálculo criticidad"   -> valores CID y resultado (valor + impacto)
+#
+# Beneficios:
+#   - Facilita auditoría, trazabilidad y control
+#   - Salida directa para "partes interesadas"
+#   - Permite análisis externo en Excel sin tocar el sistema
+# ------------------------------------------------------------
+
+import pandas as pd
+from typing import List, Dict
+
+
+# Columnas para hoja de inventario (estructura defendible)
+INV_COLS = [
+    "ID",
+    "Ubicación",
+    "Tipo de activo",
+    "Descripción",
+    "Propietario",
+    "Responsable de seguridad",
+    "Fecha del registro",
+    "Estado",
+    "Riesgo asociado",
+    "Sensibilidad",
+    "Criticidad",
+]
+
+# Columnas para hoja CID
+CID_COLS = [
+    "ID",
+    "C",
+    "I",
+    "D",
+    "Valor",
+    "Impacto",
+]
+
+
+def generate_excel(inventario_rows: List[Dict], cid_rows: List[Dict], out_path: str) -> None:
+    """
+    Crea el Excel en out_path.
+
+    Params:
+      - inventario_rows: lista de dict con campos INV_COLS
+      - cid_rows: lista de dict con campos CID_COLS
+      - out_path: ruta de salida del .xlsx
+
+    Notas:
+      - Usa openpyxl como engine.
+      - Si faltan columnas, pandas las rellena con NaN,
+        por eso se recomienda mantener la estructura consistente.
+    """
+
+    # Crear DataFrame asegurando orden de columnas
+    df_inv = pd.DataFrame(inventario_rows, columns=INV_COLS)
+    df_cid = pd.DataFrame(cid_rows, columns=CID_COLS)
+
+    # Escribir a Excel con 2 hojas
+    with pd.ExcelWriter(out_path, engine="openpyxl") as writer:
+        df_inv.to_excel(writer, index=False, sheet_name="Listado y Valoración")
+        df_cid.to_excel(writer, index=False, sheet_name="Cálculo criticidad")
+
+    # No retorna nada: el archivo queda guardado en out_path
+\end{lstlisting}

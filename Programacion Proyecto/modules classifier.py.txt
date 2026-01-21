@@ -1,0 +1,134 @@
+\begin{lstlisting}[language=Python, caption={modules/classifier.py - Clasificación de activos a partir de puertos/servicios}]
+# modules/classifier.py
+# ------------------------------------------------------------
+# Objetivo:
+#   Convertir un host detectado por Nmap (ip + puertos + servicios)
+#   en un "Activo de información" entendible para gestión:
+#     - tipo: Base de datos / Servicio / Hardware
+#     - sensibilidad: Pública / Interna / Confidencial
+#     - riesgo base asociado (texto)
+#     - descripción legible (para reportes)
+#
+# Este módulo actúa como "traducción" entre datos técnicos (nmap)
+# y lenguaje de gobierno/gestión de riesgos.
+# ------------------------------------------------------------
+
+from typing import Dict, List
+
+
+def classify_asset(host: Dict) -> Dict:
+    """
+    Recibe un host (dict) con la estructura generada por scanner.py:
+      {
+        "ip": "...",
+        "hostname": "...",
+        "open_ports": [
+           {"port": 80, "service": "http", "product": "nginx"},
+           ...
+        ]
+      }
+
+    Retorna un dict con:
+      - ip, hostname
+      - tipo
+      - descripcion
+      - riesgo
+      - sensibilidad
+    """
+
+    # Extraer puertos y servicios detectados
+    open_ports: List[Dict] = host.get("open_ports", [])
+    ports = [p.get("port") for p in open_ports if p.get("port") is not None]
+    services = [p.get("service", "") for p in open_ports if p.get("service")]
+
+    ip = host.get("ip", "")
+    hostname = host.get("hostname", "")
+
+    # Función auxiliar: verificar si un puerto está abierto
+    def has(port: int) -> bool:
+        return port in ports
+
+    # =========================================================
+    # Reglas de clasificación (baseline)
+    # =========================================================
+    # Nota: Estas reglas son simples (heurísticas) y pueden
+    # ampliarse para entornos más reales.
+    #
+    # Priorización:
+    #   - BD primero (alto impacto)
+    #   - Luego web/mail
+    #   - Luego acceso remoto/SMB
+    #   - Sino -> hardware genérico
+    # =========================================================
+
+    # 1) Bases de datos comunes
+    if has(3306) or has(5432) or has(1433) or has(27017) or has(1521):
+        tipo = "Base de datos"
+        sensibilidad = "Confidencial"
+        riesgo = (
+            "Fuga o manipulación de información, pérdida de integridad, "
+            "interrupción del servicio, sanciones legales y daño reputacional."
+        )
+
+    # 2) Servicios web
+    elif has(80) or has(443):
+        tipo = "Servicio"
+        sensibilidad = "Pública"
+        riesgo = (
+            "Exposición a ataques web (defacement, explotación de vulnerabilidades, "
+            "DDoS), caída del servicio y afectación reputacional."
+        )
+
+    # 3) Correo / mensajería (puertos típicos)
+    elif has(25) or has(587) or has(465) or has(110) or has(995) or has(143) or has(993):
+        tipo = "Servicio"
+        sensibilidad = "Interna"
+        riesgo = (
+            "Suplantación de identidad, phishing, pérdida de correos, "
+            "acceso no autorizado y fuga de información."
+        )
+
+    # 4) Acceso remoto / archivos (SMB/RDP/SSH)
+    elif has(445) or has(139) or has(3389) or has(22):
+        tipo = "Hardware"
+        sensibilidad = "Confidencial"
+        riesgo = (
+            "Compromiso del equipo por accesos remotos o comparticiones inseguras, "
+            "ransomware/malware, robo de credenciales y movimiento lateral."
+        )
+
+    # 5) Caso por defecto
+    else:
+        tipo = "Hardware"
+        sensibilidad = "Interna"
+        riesgo = (
+            "Riesgos generales: fallas físicas, robo, acceso no autorizado, "
+            "configuración insegura o falta de actualizaciones."
+        )
+
+    # =========================================================
+    # Construcción de descripción legible
+    # =========================================================
+
+    # Servicios únicos (para evitar repetidos)
+    uniq_services = sorted(set([s for s in services if s]))
+
+    # Si hay nombre DNS, lo usamos; si no, usamos la IP
+    target_name = hostname if hostname else ip
+
+    if uniq_services:
+        descripcion = f"Host {target_name} con servicios: {', '.join(uniq_services)}"
+    else:
+        descripcion = f"Host {target_name} detectado (sin servicios identificados)"
+
+    # Retornar datos para server.py (inventario/reportes)
+    return {
+        "ip": ip,
+        "hostname": hostname,
+        "tipo": tipo,
+        "descripcion": descripcion,
+        "riesgo": riesgo,
+        "sensibilidad": sensibilidad,
+    }
+
+\end{lstlisting}

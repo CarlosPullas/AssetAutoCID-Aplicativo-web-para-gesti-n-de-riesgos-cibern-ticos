@@ -1,0 +1,178 @@
+\begin{lstlisting}[language=Python, caption={modules/scanner.py - Descubrimiento y escaneo de servicios con Nmap (2 fases)}]
+# modules/scanner.py
+# ------------------------------------------------------------
+# Escaneo robusto con Nmap en 2 fases:
+#   1) Descubrimiento de hosts UP: nmap -sn -n <target>
+#      - Obtiene solo hosts activos (sin escanear puertos todavía)
+#   2) Escaneo de servicios SOLO para los hosts UP:
+#      nmap -Pn -sV -T4 <ip1 ip2 ip3 ...>
+#
+# Beneficios:
+#   - Evita "HOSTS: 0" (se hace fallback con -Pn si ICMP/ARP falla)
+#   - Reduce tiempo (no hace -sV a 255 IPs, sino a las que responden)
+#   - Devuelve resultados estructurados (ip, hostname, puertos abiertos)
+# ------------------------------------------------------------
+
+import subprocess
+import tempfile
+import xml.etree.ElementTree as ET
+from typing import List, Dict
+
+
+# ============================================================
+# Utilidad: ejecutar nmap y guardar salida XML
+# ============================================================
+
+def _run_nmap_to_xml(args: List[str]) -> str:
+    """
+    Ejecuta nmap con los argumentos entregados y genera un archivo XML temporal.
+    Retorna la ruta del XML para ser parseado.
+    """
+
+    # Creamos un archivo temporal con sufijo .xml
+    with tempfile.NamedTemporaryFile(suffix=".xml", delete=False) as tmp:
+        xml_path = tmp.name
+
+    # Construimos el comando final:
+    # nmap <args> -oX <xml_path>
+    cmd = ["nmap"] + args + ["-oX", xml_path]
+
+    # Ejecuta nmap (captura stdout/stderr)
+    p = subprocess.run(cmd, capture_output=True, text=True)
+
+    # Si nmap falla, levantamos error (para debug y robustez)
+    if p.returncode != 0:
+        err = p.stderr.strip() or p.stdout.strip()
+        raise RuntimeError(f"Nmap falló: {err}")
+
+    return xml_path
+
+
+# ============================================================
+# Parsear XML: hosts UP (discover phase)
+# ============================================================
+
+def _parse_up_hosts(xml_path: str) -> List[str]:
+    """
+    Lee XML de nmap y devuelve IPs con status=up.
+    Sirve para la fase de descubrimiento.
+    """
+    root = ET.parse(xml_path).getroot()
+    ips: List[str] = []
+
+    for host in root.findall("host"):
+        st = host.find("status")
+        if st is None or st.get("state") != "up":
+            continue
+
+        addr = host.find("address[@addrtype='ipv4']")
+        if addr is not None and addr.get("addr"):
+            ips.append(addr.get("addr"))
+
+    return ips
+
+
+# ============================================================
+# Parsear XML: puertos/servicios (service phase)
+# ============================================================
+
+def _parse_services(xml_path: str) -> List[Dict]:
+    """
+    Lee XML de nmap -sV y devuelve lista de hosts con:
+      - ip
+      - hostname
+      - open_ports: [{port, service, product}]
+    """
+    root = ET.parse(xml_path).getroot()
+    results: List[Dict] = []
+
+    for host in root.findall("host"):
+        st = host.find("status")
+        if st is None or st.get("state") != "up":
+            continue
+
+        addr = host.find("address[@addrtype='ipv4']")
+        ip = addr.get("addr") if addr is not None else "unknown"
+
+        # Hostname (si aparece)
+        hn = host.find("hostnames/hostname")
+        hostname = hn.get("name") if hn is not None else ""
+
+        open_ports: List[Dict] = []
+
+        # Recorremos todos los puertos
+        for prt in host.findall("ports/port"):
+            state = prt.find("state")
+            if state is None or state.get("state") != "open":
+                continue
+
+            portid = int(prt.get("portid"))
+            svc = prt.find("service")
+            sname = svc.get("name") if svc is not None else ""
+            prod = svc.get("product") if svc is not None and svc.get("product") else ""
+
+            open_ports.append({
+                "port": portid,
+                "service": sname,
+                "product": prod
+            })
+
+        results.append({
+            "ip": ip,
+            "hostname": hostname,
+            "open_ports": open_ports
+        })
+
+    return results
+
+
+# ============================================================
+# Función pública: scan(target)
+# ============================================================
+
+def scan(target: str) -> List[Dict]:
+    """
+    Ejecuta escaneo sobre:
+      - CIDR: 10.10.10.0/24
+      - Lista: 10.10.10.10,10.10.10.20
+
+    Retorna una lista de hosts con puertos abiertos y servicios.
+    """
+
+    # Limpieza básica del target
+    target = target.strip()
+
+    # Si viene lista separada por comas, la convertimos a espacios
+    # para que nmap reciba: ip1 ip2 ip3
+    if "," in target and "/" not in target:
+        target = " ".join([x.strip() for x in target.split(",") if x.strip()])
+
+    # --------------------------------------------------------
+    # FASE 1: Descubrimiento de hosts UP
+    # --------------------------------------------------------
+    # -sn => Ping scan (no escanea puertos)
+    # -n  => no resolver DNS (más rápido)
+    discover_xml = _run_nmap_to_xml(["-sn", "-n", target])
+    up_ips = _parse_up_hosts(discover_xml)
+
+    # Fallback: si no encontró hosts (firewall bloquea ICMP/ARP)
+    # -Pn => trata hosts como UP, y fuerza a nmap a continuar
+    if not up_ips:
+        discover_xml = _run_nmap_to_xml(["-Pn", "-sn", "-n", target])
+        up_ips = _parse_up_hosts(discover_xml)
+
+    # Si aún no hay IPs, devolvemos lista vacía
+    if not up_ips:
+        return []
+
+    # --------------------------------------------------------
+    # FASE 2: Escaneo de servicios SOLO a IPs UP
+    # --------------------------------------------------------
+    # -Pn => evita depender de ping
+    # -sV => detección de versión de servicio
+    # -T4 => velocidad rápida (balance demo)
+    svc_xml = _run_nmap_to_xml(["-Pn", "-sV", "-T4"] + up_ips)
+
+    return _parse_services(svc_xml)
+
+\end{lstlisting}
