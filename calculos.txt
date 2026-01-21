@@ -1,0 +1,38 @@
+Código de cálculo de riesgo inherente
+
+El código para calcular el riesgo inherente es sencillo. Tomamos los valores de probabilidad e impacto de un formulario o base de datos y los multiplicamos.
+
+
+# Cálculo del riesgo inherente
+def calcular_riesgo_inherente(probabilidad, impacto):
+    riesgo_inherente = probabilidad * impacto
+    return riesgo_inherente
+
+
+En este ejemplo, el cálculo de riesgo inherente es realizado dentro de una función calcular_riesgo_inherente que toma la probabilidad y el impacto como parámetros, y devuelve el valor calculado.
+
+
+
+Código de cálculo de riesgo residual
+
+De manera similar, para el riesgo residual, tomamos los valores ajustados de probabilidad e impacto después de aplicar controles.
+
+# Cálculo del riesgo residual
+def calcular_riesgo_residual(probabilidad_residual, impacto_residual):
+    riesgo_residual = probabilidad_residual * impacto_residual
+    return riesgo_residual
+
+el cálculo de riesgo residual sigue la misma lógica que el de riesgo inherente, pero con valores ajustados luego de implementar controles.
+
+
+
+
+La criticidad es la suma de los valores asignados a confidencialidad, integridad y disponibilidad. El cálculo puede verse como sigue:
+
+# Cálculo de la criticidad
+def calcular_criticidad(confidencialidad, integridad, disponibilidad):
+    criticidad = confidencialidad + integridad + disponibilidad
+    return criticidad
+
+
+Este fragmento de código toma los valores de los tres componentes de la criticidad y devuelve el resultado sumado, el cual se utiliza para clasificar el activo.
