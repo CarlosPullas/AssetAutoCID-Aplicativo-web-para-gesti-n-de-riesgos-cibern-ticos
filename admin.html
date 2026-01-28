@@ -1,0 +1,128 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Admin - Riesgos</title>
+  <style>
+    body { font-family: Arial; background:#f6f7fb; margin:0; }
+    .topbar { background:#111827; color:#fff; padding:14px 18px; display:flex; justify-content:space-between; align-items:center; }
+    .brand { font-weight:800; letter-spacing:.2px; }
+    .links a { color:#fff; text-decoration:none; margin-left:14px; font-size:14px; opacity:.9; }
+    .links a:hover { opacity:1; text-decoration:underline; }
+
+    .container { padding:18px; }
+    .cards { display:flex; gap:10px; flex-wrap:wrap; margin-bottom:12px; }
+    .card { background:#fff; border:1px solid #e6e6e6; border-radius:14px; padding:12px 14px; box-shadow:0 10px 28px rgba(0,0,0,.05); min-width:210px; }
+    .card .k { color:#666; font-size:12px; }
+    .card .v { font-size:22px; font-weight:800; margin-top:4px; }
+
+    table { width:100%; border-collapse:collapse; background:#fff; border:1px solid #e6e6e6; border-radius:14px; overflow:hidden; box-shadow:0 10px 28px rgba(0,0,0,.05); }
+    th { background:#f1f5f9; text-align:left; font-size:12px; padding:10px; border-bottom:1px solid #e6e6e6; }
+    td { font-size:12.5px; padding:10px; border-bottom:1px solid #f0f0f0; vertical-align:top; }
+    tr:last-child td { border-bottom:none; }
+    .pill { display:inline-block; padding:3px 10px; border-radius:999px; font-size:12px; border:1px solid #ddd; background:#fafafa; }
+    .score { font-weight:800; }
+
+    select { padding:7px; border-radius:10px; border:1px solid #d7d7d7; }
+    button { padding:7px 10px; border:none; border-radius:10px; background:#16a34a; color:#fff; font-weight:700; cursor:pointer; }
+    button:hover { background:#12803a; }
+
+    .muted { color:#666; }
+  </style>
+</head>
+<body>
+  <div class="topbar">
+    <div class="brand">AssetAutoCID • Admin</div>
+    <div class="links">
+      <span class="muted" style="color:#cbd5e1;">{{ empresa }}</span>
+      <a href="/dashboard">Dashboard</a>
+      <a href="/logout">Salir</a>
+    </div>
+  </div>
+
+  <div class="container">
+    <div class="cards">
+      <div class="card"><div class="k">Activos registrados</div><div class="v">{{ total_assets }}</div></div>
+      <div class="card"><div class="k">Riesgos registrados</div><div class="v">{{ total_risks }}</div></div>
+      <div class="card"><div class="k">Acción</div><div class="v" style="font-size:14px;font-weight:700;margin-top:8px;">Cambiar estado de riesgos</div></div>
+    </div>
+
+    <table>
+      <tr>
+        <th>ID</th>
+        <th>Activo</th>
+        <th>Amenaza</th>
+        <th>Vulnerabilidad</th>
+        <th>Inherente</th>
+        <th>Residual</th>
+        <th>Estado</th>
+        <th>Guardar</th>
+      </tr>
+
+      {% for r in risks %}
+      <tr>
+        <td><span class="pill">#{{ r.id }}</span></td>
+        <td><span class="pill">{{ r.asset_id }}</span></td>
+        <td>{{ r.amenaza }}</td>
+        <td>{{ r.vulnerabilidad }}</td>
+        <td class="score">{{ r.riesgo_inherente }}</td>
+        <td>{{ r.residual or "-" }}</td>
+        <td>
+          <form method="POST" action="/admin/risk/{{ r.id }}/state">
+            <select name="estado">
+              {% for st in ["Abierto","En tratamiento","Verificado","Cerrado"] %}
+                <option value="{{ st }}" {% if r.estado==st %}selected{% endif %}>{{ st }}</option>
+              {% endfor %}
+            </select>
+        </td>
+        <td>
+            <button type="submit">Guardar</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </table>
+<h2>2.1 Listado de activos y criticidad</h2>
+
+<table>
+  <thead>
+    <tr>
+      <th>ID</th>
+      <th>Ubicación</th>
+      <th>Tipo</th>
+      <th>Descripción</th>
+      <th>Sensibilidad</th>
+      <th>Criticidad</th>
+      <th>Impacto</th>
+      <th>Editar CID</th>
+    </tr>
+  </thead>
+  <tbody>
+
+  {% for a in assets_list %}
+  <tr>
+    <td>{{ a.id }}</td>
+    <td>{{ a.ubicacion }}</td>
+    <td>{{ a.tipo }}</td>
+    <td>{{ a.descripcion }}</td>
+    <td>{{ a.sensibilidad }}</td>
+    <td>{{ a.criticidad }}</td>
+    <td>{{ a.impacto }}</td>
+
+    <td>
+      <form method="POST" action="/admin/edit_asset_cid/{{ a.id }}">
+        <input type="number" name="C" value="{{ a.C }}" min="1" max="5" required>
+        <input type="number" name="I" value="{{ a.I }}" min="1" max="5" required>
+        <input type="number" name="D" value="{{ a.D }}" min="1" max="5" required>
+        <button type="submit">Guardar</button>
+      </form>
+    </td>
+  </tr>
+  {% endfor %}
+
+  </tbody>
+</table>
+  </div>
+</body>
+</html>
+
